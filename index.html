@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>NBA Bayesian Total Points Model · snk2002</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+
+  <!-- MathJax (cdnjs) -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' },
+      options: {
+        skipHtmlTags: ['script','noscript','style','textarea','pre','code']
+      }
+    };
+  </script>
+  <script id="MathJax-script" async
+    src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js">
+  </script>
+
+  <style>
+    /* ── Reset ────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0a;
+      --bg2:       #111111;
+      --bg3:       #161616;
+      --border:    #1f1f1f;
+      --border2:   #2a2a2a;
+      --green:     #00ff88;
+      --blue:      #00ccff;
+      --dim-green: rgba(0,255,136,0.12);
+      --dim-blue:  rgba(0,204,255,0.10);
+      --text:      #b8b8b8;
+      --text-dim:  #555;
+      --text-mid:  #777;
+      --text-bright: #e4e4e4;
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'IBM Plex Sans', sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.75;
+      overflow-x: hidden;
+    }
+
+    /* ── Scanlines ────────────────────────────────────── */
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.032) 2px,
+        rgba(0,0,0,0.032) 4px
+      );
+      pointer-events: none;
+      z-index: 9000;
+    }
+
+    /* ── Sticky Nav ───────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      background: rgba(10,10,10,0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      z-index: 800;
+    }
+
+    .nav-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 2rem;
+      height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--green);
+      letter-spacing: 0.06em;
+    }
+
+    .nav-logo .dim { color: var(--text-dim); }
+
+    .nav-links {
+      list-style: none;
+      display: flex;
+      gap: 1.6rem;
+    }
+
+    .nav-links a {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      text-decoration: none;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      transition: color 0.18s;
+    }
+
+    .nav-links a:hover { color: var(--green); }
+
+    @media (max-width: 720px) {
+      .nav-links { display: none; }
+    }
+
+    /* ── Shared layout ────────────────────────────────── */
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 5rem 2rem;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── Typography ───────────────────────────────────── */
+    .section-label {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--green);
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      margin-bottom: 0.7rem;
+    }
+
+    h2 {
+      font-family: var(--mono);
+      font-size: clamp(1.3rem, 2.5vw, 1.75rem);
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 1.25rem;
+      line-height: 1.3;
+    }
+
+    h3 {
+      font-family: var(--mono);
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--green);
+      margin-bottom: 0.8rem;
+    }
+
+    p { color: var(--text); margin-bottom: 0.9rem; }
+    p:last-child { margin-bottom: 0; }
+
+    /* ── Fade-in on scroll ────────────────────────────── */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(22px);
+      transition: opacity 0.65s ease, transform 0.65s ease;
+    }
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ══════════════════════════════════════════════════
+       SECTION 1 — HERO
+    ══════════════════════════════════════════════════ */
+    #hero {
+      min-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 7rem 2rem 5rem;
+    }
+
+    .hero-eyebrow {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--green);
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+      opacity: 0;
+      animation: fadeUp 0.65s ease forwards 0.15s;
+    }
+
+    .hero-title {
+      font-family: var(--mono);
+      font-size: clamp(1.75rem, 4.5vw, 3.4rem);
+      font-weight: 700;
+      color: var(--text-bright);
+      line-height: 1.18;
+      margin-bottom: 1.5rem;
+      opacity: 0;
+      animation: fadeUp 0.65s ease forwards 0.35s;
+    }
+
+    .hero-title .hl-g { color: var(--green); }
+    .hero-title .hl-b { color: var(--blue); }
+
+    .hero-sub {
+      font-size: 1rem;
+      color: var(--text-mid);
+      max-width: 600px;
+      margin-bottom: 3rem;
+      opacity: 0;
+      animation: fadeUp 0.65s ease forwards 0.55s;
+    }
+
+    .stat-row {
+      display: flex;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+      opacity: 0;
+      animation: fadeUp 0.65s ease forwards 0.75s;
+    }
+
+    .stat-box {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      padding: 1.1rem 1.6rem;
+      min-width: 160px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-box::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px; height: 100%;
+      background: var(--green);
+    }
+
+    .stat-box.sb-blue::before { background: var(--blue); }
+
+    .sb-value {
+      font-family: var(--mono);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--green);
+      display: block;
+      line-height: 1.2;
+    }
+
+    .stat-box.sb-blue .sb-value { color: var(--blue); }
+
+    .sb-label {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-top: 0.3rem;
+      display: block;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ══════════════════════════════════════════════════
+       SECTION 2 — THE PROBLEM
+    ══════════════════════════════════════════════════ */
+    .prob-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin-bottom: 3rem;
+    }
+
+    @media (max-width: 680px) {
+      .prob-grid { grid-template-columns: 1fr; }
+    }
+
+    .prob-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      padding: 1.4rem 1.5rem;
+    }
+
+    .prob-card h3 {
+      font-size: 0.82rem;
+      margin-bottom: 0.65rem;
+    }
+
+    .prob-card h3.blue { color: var(--blue); }
+
+    .prob-card p {
+      font-size: 0.88rem;
+      color: var(--text-dim);
+      line-height: 1.65;
+    }
+
+    /* Pipeline */
+    .pipeline-label {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      color: var(--text-dim);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 1.4rem;
+    }
+
+    .pipeline {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+    }
+
+    .pipe-step {
+      flex: 1;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      padding: 1.4rem 1rem;
+      text-align: center;
+      position: relative;
+    }
+
+    .pipe-step:not(:first-child) {
+      border-left: none;
+    }
+
+    .pipe-step::after {
+      content: '→';
+      position: absolute;
+      right: -14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-family: var(--mono);
+      font-size: 1rem;
+      color: var(--green);
+      z-index: 2;
+    }
+
+    .pipe-step:last-child::after { display: none; }
+
+    .pipe-num {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      color: var(--text-dim);
+      letter-spacing: 0.15em;
+      margin-bottom: 0.5rem;
+    }
+
+    .pipe-icon {
+      font-family: var(--mono);
+      font-size: 1.5rem;
+      color: var(--blue);
+      display: block;
+      margin-bottom: 0.5rem;
+      line-height: 1;
+    }
+
+    .pipe-name {
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+
+    .pipe-desc {
+      font-family: var(--sans);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    @media (max-width: 680px) {
+      .pipeline { flex-direction: column; }
+      .pipe-step:not(:first-child) { border-left: 1px solid var(--border); border-top: none; }
+      .pipe-step::after { content: '↓'; right: auto; top: auto; bottom: -14px; left: 50%; transform: translateX(-50%); }
+    }
+
+    /* ══════════════════════════════════════════════════
+       SECTION 3 — THE MATH
+    ══════════════════════════════════════════════════ */
+    .math-block {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--blue);
+      padding: 1.75rem 2rem;
+      margin: 1.5rem 0;
+      overflow-x: auto;
+    }
+
+    .math-block + .math-block { margin-top: 1.25rem; }
+
+    .math-block h3 {
+      font-size: 0.72rem;
+      color: var(--blue);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 1.1rem;
+    }
+
+    .math-block .math-note {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-top: 0.8rem;
+      margin-bottom: 0;
+      font-style: italic;
+    }
+
+    mjx-container { color: var(--text-bright) !important; }
+
+    /* ══════════════════════════════════════════════════
+       SECTION 5 — LIVE UPDATE
+    ══════════════════════════════════════════════════ */
+    .callout {
+      background: var(--dim-green);
+      border: 1px solid rgba(0,255,136,0.22);
+      padding: 1.2rem 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .callout.blue {
+      background: var(--dim-blue);
+      border-color: rgba(0,204,255,0.2);
+    }
+
+    .callout-title {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--green);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 0.6rem;
+    }
+
+    .callout.blue .callout-title { color: var(--blue); }
+
+    .callout p { font-size: 0.88rem; line-height: 1.7; }
+
+    /* ══════════════════════════════════════════════════
+       SECTION 6 — TERMINAL OUTPUT
+    ══════════════════════════════════════════════════ */
+    .term-chrome {
+      background: #181818;
+      border: 1px solid var(--border2);
+      border-bottom: none;
+      padding: 0.5rem 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .tdot {
+      width: 11px; height: 11px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .tdot-r { background: #ff5f57; }
+    .tdot-y { background: #ffbd2e; }
+    .tdot-g { background: #28ca41; }
+
+    .term-chrome-title {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      margin-left: 0.4rem;
+    }
+
+    .terminal {
+      background: #050505;
+      border: 1px solid var(--border2);
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      line-height: 1.9;
+      padding: 1.4rem 1.6rem;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .t-hdr  { color: var(--green); font-weight: 700; }
+    .t-key  { color: var(--blue); }
+    .t-val  { color: var(--text-bright); }
+    .t-dim  { color: var(--text-dim); }
+    .t-fill { color: var(--green); }
+    .t-empty{ color: #1e1e1e; }
+    .t-pct  { color: var(--text-bright); }
+
+    /* ══════════════════════════════════════════════════
+       SECTION 7 — KALSHI TRADING
+    ══════════════════════════════════════════════════ */
+    .trade-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      margin: 1.5rem 0;
+    }
+
+    .trade-table th {
+      background: var(--bg3);
+      color: var(--blue);
+      font-weight: 600;
+      padding: 0.7rem 1.1rem;
+      text-align: left;
+      border: 1px solid var(--border2);
+      font-size: 0.68rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .trade-table td {
+      padding: 0.7rem 1.1rem;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .trade-table tr:hover td { background: rgba(255,255,255,0.015); }
+
+    .td-field { color: var(--text-dim); }
+    .td-val   { color: var(--text-bright); }
+    .td-edge  { color: var(--green); font-weight: 700; }
+    .td-act   { color: var(--green); font-weight: 700; }
+
+    .port-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+      margin: 1.5rem 0;
+    }
+
+    @media (max-width: 680px) {
+      .port-grid { grid-template-columns: 1fr; }
+    }
+
+    .port-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      padding: 1.3rem;
+    }
+
+    .port-badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 0.18rem 0.5rem;
+      border: 1px solid;
+      margin-bottom: 0.75rem;
+    }
+
+    .port-badge.g { color: var(--green); border-color: rgba(0,255,136,0.28); }
+    .port-badge.b { color: var(--blue);  border-color: rgba(0,204,255,0.28); }
+
+    .port-card h3 {
+      font-size: 0.85rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-bright);
+    }
+
+    .port-card p {
+      font-size: 0.84rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    /* ══════════════════════════════════════════════════
+       SECTION 8 — IN DEVELOPMENT
+    ══════════════════════════════════════════════════ */
+    .dev-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.2rem;
+      margin: 1.5rem 0;
+    }
+
+    @media (max-width: 860px) { .dev-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 560px) { .dev-grid { grid-template-columns: 1fr; } }
+
+    .dev-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      padding: 1.3rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .dev-card::after {
+      content: 'IN DEV';
+      position: absolute;
+      top: 0.65rem; right: 0.65rem;
+      font-family: var(--mono);
+      font-size: 0.5rem;
+      letter-spacing: 0.18em;
+      color: var(--blue);
+      border: 1px solid rgba(0,204,255,0.25);
+      padding: 0.12rem 0.4rem;
+    }
+
+    .dev-card h3 { color: var(--blue); font-size: 0.85rem; }
+
+    .dev-card p {
+      font-size: 0.83rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    /* ══════════════════════════════════════════════════
+       FOOTER
+    ══════════════════════════════════════════════════ */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 2rem;
+      text-align: center;
+    }
+
+    .footer-text {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      letter-spacing: 0.12em;
+    }
+
+    .footer-text .fg { color: var(--green); }
+    .footer-text .sep { margin: 0 0.5rem; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 0; }
+    ::-webkit-scrollbar-thumb:hover { background: #333; }
+  </style>
+</head>
+<body>
+
+<!-- Scanline overlay -->
+<div class="scanlines" aria-hidden="true"></div>
+
+<!-- ══ NAV ═══════════════════════════════════════════ -->
+<nav>
+  <div class="nav-inner">
+    <span class="nav-logo">$ nba_bayes <span class="dim">·</span> snk2002</span>
+    <ul class="nav-links">
+      <li><a href="#problem">Problem</a></li>
+      <li><a href="#math">Math</a></li>
+      <li><a href="#live">Live</a></li>
+      <li><a href="#output">Output</a></li>
+      <li><a href="#trading">Trading</a></li>
+      <li><a href="#dev">Dev</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ══ SECTION 1: HERO ════════════════════════════════ -->
+<section id="hero">
+  <div class="hero-eyebrow">// Prediction Markets &middot; NBA Totals &middot; MCMC</div>
+  <h1 class="hero-title">
+    Bayesian <span class="hl-g">Hierarchical</span> Model<br>
+    for <span class="hl-b">NBA Totals</span>
+  </h1>
+  <p class="hero-sub">
+    A fully probabilistic model for NBA game total points, built for Kalshi
+    prediction markets. Posterior distributions over team offense and defense
+    with sub-second halftime reweighting.
+  </p>
+  <div class="stat-row">
+    <div class="stat-box">
+      <span class="sb-value">4 chains</span>
+      <span class="sb-label">MCMC sampling</span>
+    </div>
+    <div class="stat-box sb-blue">
+      <span class="sb-value">&lt;1s</span>
+      <span class="sb-label">Live update</span>
+    </div>
+    <div class="stat-box">
+      <span class="sb-value">Student-t</span>
+      <span class="sb-label">Likelihood</span>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ══ SECTION 2: THE PROBLEM ═════════════════════════ -->
+<div class="container fade-in" id="problem">
+  <div class="section-label">// 01 &middot; The Problem</div>
+  <h2>Why Standard Models Fail</h2>
+  <p>
+    Prediction market pricing for NBA totals is driven by historical averages and
+    line movement — two structural flaws create exploitable edges.
+  </p>
+
+  <div class="prob-grid">
+    <div class="prob-card">
+      <h3>// Gaussian Assumption Fails</h3>
+      <p>
+        Normal distributions assign near-zero probability to extreme scores.
+        NBA totals exhibit heavy tails — blowouts, overtime games, and
+        defensive playoff grinds all occur far more often than a Gaussian predicts.
+        A Student-t likelihood with learned degrees of freedom captures this directly.
+      </p>
+    </div>
+    <div class="prob-card">
+      <h3 class="blue">// Flat Priors Lose Information</h3>
+      <p>
+        Treating each team independently ignores the league-wide signal.
+        A team with 5 games of data gets wildly uncertain estimates.
+        Hierarchical pooling borrows strength across all 30 teams — data-sparse
+        teams shrink toward the league mean while established teams stay near
+        their empirical rate.
+      </p>
+    </div>
+    <div class="prob-card">
+      <h3>// Static Lines Miss Game State</h3>
+      <p>
+        Pre-game lines go stale at tip-off. First-half pace, foul trouble, and
+        injury scratches all shift the second-half distribution significantly.
+        Importance-weighted posterior reweighting at halftime updates the
+        prediction without rerunning MCMC.
+      </p>
+    </div>
+    <div class="prob-card">
+      <h3 class="blue">// Playoff Regime Ignored</h3>
+      <p>
+        Playoff basketball is a different sport. Slower pace, longer possessions,
+        elite defenses — the expected total shifts down by several points relative
+        to an equivalent regular-season matchup. A single learned scalar captures
+        this regime shift without overfitting to small playoff samples.
+      </p>
+    </div>
+  </div>
+
+  <div class="pipeline-label">Model pipeline</div>
+  <div class="pipeline">
+    <div class="pipe-step">
+      <div class="pipe-num">01</div>
+      <span class="pipe-icon">&#9651;</span>
+      <span class="pipe-name">Data</span>
+      <span class="pipe-desc">Historical NBA games<br>team stats, game type</span>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-num">02</div>
+      <span class="pipe-icon">&#8853;</span>
+      <span class="pipe-name">Prior</span>
+      <span class="pipe-desc">Weakly informative<br>hierarchical hyperpriors</span>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-num">03</div>
+      <span class="pipe-icon">&#8767;</span>
+      <span class="pipe-name">Posterior</span>
+      <span class="pipe-desc">NUTS sampler<br>4 chains &times; 1 000 draws</span>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-num">04</div>
+      <span class="pipe-icon">&#36;</span>
+      <span class="pipe-name">Trade</span>
+      <span class="pipe-desc">P(over) vs market<br>edge detection</span>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══ SECTION 3: THE MATH ════════════════════════════ -->
+<div class="container fade-in" id="math">
+  <div class="section-label">// 02 &middot; The Math</div>
+  <h2>Model Specification</h2>
+  <p>
+    A non-centered hierarchical model with Student-t likelihood.
+    Non-centering improves sampler geometry — particularly important when
+    team-level variance $\sigma$ is small relative to the hyperprior.
+  </p>
+
+  <div class="math-block">
+    <h3>Hyperpriors &mdash; Offense &amp; Defense (Non-Centered)</h3>
+    $$
+    \mu_{\alpha} \sim \mathcal{N}(113,\,5), \quad
+    \sigma_{\alpha} \sim \text{HalfNormal}(5)
+    $$
+    $$
+    \mu_{\delta} \sim \mathcal{N}(113,\,5), \quad
+    \sigma_{\delta} \sim \text{HalfNormal}(5)
+    $$
+    $$
+    \alpha_k^{\text{raw}} \sim \mathcal{N}(0,\,1), \quad
+    \alpha_k = \mu_{\alpha} + \sigma_{\alpha}\,\alpha_k^{\text{raw}}
+    \quad \forall\; k \in \{1,\ldots,K\}
+    $$
+    $$
+    \delta_k^{\text{raw}} \sim \mathcal{N}(0,\,1), \quad
+    \delta_k = \mu_{\delta} + \sigma_{\delta}\,\delta_k^{\text{raw}}
+    $$
+    <p class="math-note">
+      $\alpha_k$ = team $k$ offensive rating; $\delta_k$ = team $k$ defensive rating.
+      Non-centering decouples the hyperparameters from the team offsets,
+      giving NUTS a near-Euclidean geometry to explore.
+    </p>
+  </div>
+
+  <div class="math-block">
+    <h3>Game-Level Expected Total</h3>
+    $$
+    \mu_g \;=\;
+    \frac{\alpha_{\text{home}} + \alpha_{\text{away}} + \delta_{\text{home}} + \delta_{\text{away}}}{2}
+    \;+\; \frac{\theta_{\text{home}}}{2}
+    \;+\; \gamma\,\mathbf{1}[\text{playoff}]
+    $$
+    <p class="math-note">
+      $\theta_{\text{home}} \sim \mathcal{N}(3,\,2)$ is the home-court advantage (points added to total).
+      $\gamma \sim \mathcal{N}(-6,\,5)$ is the playoff adjustment scalar —
+      negative prior reflects lower-scoring playoff games;
+      $\sigma = 5$ keeps it weakly informative so the data can shift it.
+    </p>
+  </div>
+
+  <div class="math-block">
+    <h3>Student-t Likelihood</h3>
+    $$
+    y_g \;\sim\; \text{StudentT}\!\left(\,\nu + 1,\;\mu_g,\;\sigma_{\text{game}}\right)
+    $$
+    $$
+    \nu \sim \text{Exponential}\!\left(\tfrac{1}{30}\right), \quad
+    \sigma_{\text{game}} \sim \text{HalfNormal}(12)
+    $$
+    <p class="math-note">
+      $\nu$ controls tail weight — large $\nu$ recovers Gaussian behaviour;
+      small $\nu$ allows heavy tails for blowouts and overtime.
+      The $+1$ shift enforces $\nu &gt; 1$ (finite mean).
+      The exponential prior with $\lambda = 1/30$ weakly favours
+      near-Gaussian tails while permitting heavier ones.
+    </p>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══ SECTION 5: LIVE UPDATE ═════════════════════════ -->
+<div class="container fade-in" id="live">
+  <div class="section-label">// 04 &middot; Live Update</div>
+  <h2>Halftime Posterior Reweighting</h2>
+  <p>
+    At halftime we observe the first-half total $y_{\text{1H}}$.
+    Rather than rerunning MCMC — which takes minutes — we reweight the existing
+    4 000 posterior samples by their likelihood under the observed first-half data.
+    This is sequential importance sampling without the overhead of resampling.
+  </p>
+
+  <div class="math-block" style="border-left-color: var(--green);">
+    <h3 style="color: var(--green);">Importance Weights</h3>
+    $$
+    w^{(i)} \;=\; p\!\left(y_{\text{1H}} \;\middle|\; \theta^{(i)}\right)
+    \;\propto\;
+    \text{StudentT}\!\left(
+      \nu^{(i)} + 1,\;
+      \tfrac{\mu_g^{(i)}}{2},\;
+      \tfrac{\sigma_{\text{game}}^{(i)}}{\sqrt{2}}
+    \right)
+    $$
+    <p class="math-note">
+      Each draw $\theta^{(i)}$ from the pre-game posterior receives a weight
+      proportional to how likely it makes the observed first-half score.
+      The first-half distribution uses half the game mean and
+      $\sigma / \sqrt{2}$ under the independence assumption.
+    </p>
+  </div>
+
+  <div class="math-block" style="border-left-color: var(--green);">
+    <h3 style="color: var(--green);">Updated P(over) at Halftime</h3>
+    $$
+    P\!\left(\text{over } L \;\middle|\; y_{\text{1H}}\right)
+    \;=\;
+    \frac{
+      \displaystyle\sum_{i=1}^{N} w^{(i)}\;
+      \mathbf{1}\!\left[\mu_g^{(i)} - y_{\text{1H}} \;>\; L - y_{\text{1H}}\right]
+    }{
+      \displaystyle\sum_{i=1}^{N} w^{(i)}
+    }
+    $$
+    <p class="math-note">
+      $L$ is the over/under line; $y_{\text{1H}}$ is the observed first-half total.
+      Samples whose parameters fit the first half well receive higher weight
+      in the second-half prediction — no resampling, no MCMC.
+    </p>
+  </div>
+
+  <div class="callout">
+    <div class="callout-title">// Why Reweighting Beats Resampling</div>
+    <p>
+      Resampling (bootstrap from normalised weights) introduces additional
+      Monte Carlo variance and collapses diversity when the effective sample
+      size $\hat{N}_{\text{eff}} = \bigl(\sum w_i\bigr)^2 \big/ \sum w_i^2$
+      drops low. Direct importance weighting preserves the full posterior
+      geometry — every original draw contributes proportionally to the
+      second-half estimate. The update runs in milliseconds on the
+      pre-computed trace, making it viable between commercial breaks.
+      $\hat{N}_{\text{eff}}$ is monitored and flagged if it falls below 200,
+      which would signal that the first-half outcome was an extreme surprise
+      to the pre-game model.
+    </p>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══ SECTION 6: MODEL OUTPUT ═══════════════════════ -->
+<div class="container fade-in" id="output">
+  <div class="section-label">// 05 &middot; Model Output</div>
+  <h2>Live Prediction Example</h2>
+  <p>DEN vs MIN &middot; 2025 Playoffs &middot; Pre-game posterior predictive summary.</p>
+
+  <div class="term-chrome">
+    <div class="tdot tdot-r"></div>
+    <div class="tdot tdot-y"></div>
+    <div class="tdot tdot-g"></div>
+    <span class="term-chrome-title">nba_predict.py &mdash; terminal output</span>
+  </div>
+  <div class="terminal" id="terminal-out"></div>
+</div>
+
+<hr class="divider">
+
+<!-- ══ SECTION 7: KALSHI TRADING ═════════════════════ -->
+<div class="container fade-in" id="trading">
+  <div class="section-label">// 06 &middot; Kalshi Trading</div>
+  <h2>From Posterior to Trade</h2>
+  <p>
+    The posterior predictive distribution directly yields $P(\text{over } L)$
+    for any line $L$. A trade fires when the model probability meaningfully
+    exceeds the Kalshi implied price, adjusted for liquidity and position sizing.
+  </p>
+
+  <table class="trade-table">
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="td-field">Contract</td>
+        <td class="td-val">NBA Total O/U 215 &middot; DEN vs MIN Playoffs</td>
+      </tr>
+      <tr>
+        <td class="td-field">Model P(over 215)</td>
+        <td class="td-val">51.1%</td>
+      </tr>
+      <tr>
+        <td class="td-field">Kalshi price</td>
+        <td class="td-val">44&cent;</td>
+      </tr>
+      <tr>
+        <td class="td-field">Edge</td>
+        <td class="td-edge">+7.1 pp</td>
+      </tr>
+      <tr>
+        <td class="td-field">Action</td>
+        <td class="td-act">BUY &mdash; model meaningfully above market</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin-top: 2.5rem; color: var(--text-bright);">Portfolio Construction</h3>
+  <p>
+    A single-leg bet on a 51% contract carries high variance. The portfolio
+    approach ladders position sizing and uses high-conviction anchor legs
+    to subsidize uncertainty on the main event.
+  </p>
+
+  <div class="port-grid">
+    <div class="port-card">
+      <span class="port-badge g">Anchor Leg</span>
+      <h3>High-Conviction Near-Certain Contracts</h3>
+      <p>
+        Contracts priced at 90&cent;+ where model and market agree strongly.
+        These generate consistent small returns that buffer variance on the
+        main event leg. Typically game-winner markets for heavy favourites
+        or spread contracts where the model posterior is tight.
+      </p>
+    </div>
+    <div class="port-card">
+      <span class="port-badge b">Main Leg</span>
+      <h3>Edge Contracts (5 pp+ Model Advantage)</h3>
+      <p>
+        Total points contracts where model $P(\text{over})$ diverges from
+        market by at least 5 percentage points after accounting for
+        contract fees. Position sized at 2–5% of bankroll using
+        fractional Kelly scaling to limit ruin probability.
+      </p>
+    </div>
+    <div class="port-card">
+      <span class="port-badge g">Risk Gate</span>
+      <h3>Injury Report Check Before Entry</h3>
+      <p>
+        The model does not consume real-time injury data. Before any entry,
+        the official NBA injury report is checked manually. Any key rotation
+        player listed as doubtful or out invalidates the pre-game
+        prediction — the posterior was conditioned on a full roster.
+      </p>
+    </div>
+    <div class="port-card">
+      <span class="port-badge b">Live Gate</span>
+      <h3>Halftime Reweighting Confirmation</h3>
+      <p>
+        If the pre-game edge is marginal (&lt;8 pp), execution waits for
+        halftime reweighting to confirm direction. First-half pace and
+        scoring rate frequently sharpen the posterior enough to either
+        confirm or invalidate the trade.
+      </p>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══ SECTION 8: IN DEVELOPMENT ════════════════════ -->
+<div class="container fade-in" id="dev">
+  <div class="section-label">// 07 &middot; In Development</div>
+  <h2>Broadcaster NLP Agent</h2>
+  <p>
+    Kalshi lists broadcast contracts on specific words or phrases being said
+    by NBA announcers during live games. Current market pricing relies on
+    naive historical frequency. A game-state-aware model can build a
+    meaningfully better prior.
+  </p>
+
+  <div class="dev-grid">
+    <div class="dev-card">
+      <h3>Play-by-Play Scraper</h3>
+      <p>
+        Scraping NBA.com and ESPN play-by-play feeds to build a historical
+        corpus of game state (score, time, foul count, timeout flags,
+        pace metrics) paired with timestamped broadcaster audio transcripts.
+      </p>
+    </div>
+    <div class="dev-card">
+      <h3>Phrase Probability Model</h3>
+      <p>
+        Conditional model: $P(\text{phrase said} \mid \text{game state})$.
+        Features include score margin, total points pace relative to line,
+        momentum runs, star player foul trouble, and remaining time buckets.
+      </p>
+    </div>
+    <div class="dev-card">
+      <h3>Real-Time Prior Update</h3>
+      <p>
+        Same importance-weighting framework as the totals model — a calibrated
+        prior before market open, then live updates as game state evolves.
+        Goal is a prior that beats naive base rates by &gt;10 pp on average.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout blue">
+    <div class="callout-title">// Status</div>
+    <p>
+      Data collection pipeline is live. Transcript alignment with play-by-play
+      timestamps is the current bottleneck — broadcaster audio lags the
+      official feed by 2–8 seconds, requiring a sliding-window alignment pass.
+      Preliminary results show game state features explain ~18% of phrase
+      occurrence variance, versus ~4% for the naive historical base rate.
+    </p>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══ FOOTER ════════════════════════════════════════ -->
+<footer>
+  <p class="footer-text">
+    <span class="fg">snk2002</span>
+    <span class="sep">&middot;</span>
+    built for Kalshi
+    <span class="sep">&middot;</span>
+    noindex
+  </p>
+</footer>
+
+<!-- ══ SCRIPTS ═══════════════════════════════════════ -->
+<script>
+  // ── Intersection Observer (fade-in) ──────────────────
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.07 });
+
+  document.querySelectorAll('.fade-in').forEach(el => io.observe(el));
+
+  // ── Terminal output renderer ──────────────────────────
+  const ROWS = [
+    { type: 'header', text: 'DEN (home) vs MIN \u2014 Playoffs' },
+    { type: 'blank' },
+    { type: 'stat',   key: 'Median',  val: '215.4 pts' },
+    { type: 'stat',   key: 'Mean  ',  val: '216.1 pts' },
+    { type: 'stat',   key: 'Std   ',  val: ' 19.3 pts' },
+    { type: 'stat',   key: '80% CI',  val: '[192, 241]' },
+    { type: 'stat',   key: '95% CI',  val: '[179, 254]' },
+    { type: 'blank' },
+    { type: 'bar', ou: 200, prob: 80.1 },
+    { type: 'bar', ou: 210, prob: 62.7 },
+    { type: 'bar', ou: 215, prob: 51.1 },
+    { type: 'bar', ou: 220, prob: 41.1 },
+    { type: 'bar', ou: 225, prob: 30.8 },
+    { type: 'bar', ou: 230, prob: 22.7 },
+    { type: 'bar', ou: 235, prob: 16.0 },
+    { type: 'bar', ou: 240, prob: 10.8 },
+    { type: 'bar', ou: 250, prob:  4.1 },
+  ];
+
+  const BAR_W = 32;
+
+  function makeBar(prob) {
+    const filled = Math.round((prob / 100) * BAR_W);
+    const empty  = BAR_W - filled;
+    return '<span class="t-fill">' + '\u2588'.repeat(filled) + '</span>'
+         + '<span class="t-empty">' + '\u2591'.repeat(empty) + '</span>';
+  }
+
+  function pad(s, n) {
+    return String(s).padEnd(n, '\u00a0');
+  }
+
+  const termEl = document.getElementById('terminal-out');
+  const lines  = [];
+
+  ROWS.forEach(row => {
+    if (row.type === 'header') {
+      lines.push('<span class="t-hdr">' + row.text + '</span>');
+    } else if (row.type === 'blank') {
+      lines.push('');
+    } else if (row.type === 'stat') {
+      lines.push(
+        '<span class="t-key">' + row.key + '</span>'
+        + ' : '
+        + '<span class="t-val">' + row.val + '</span>'
+      );
+    } else if (row.type === 'bar') {
+      const ouStr   = pad('O/U ' + row.ou, 8);
+      const probStr = pad('P(over) = ' + row.prob.toFixed(1) + '%', 20);
+      lines.push(
+        '<span class="t-dim">' + ouStr + '</span>  '
+        + '<span class="t-pct">' + probStr + '</span>  '
+        + makeBar(row.prob)
+      );
+    }
+  });
+
+  termEl.innerHTML = lines.join('\n');
+</script>
+
+</body>
+</html>
