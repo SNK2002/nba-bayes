@@ -1038,47 +1038,52 @@
   <div class="section-label">// 07 &middot; In Development</div>
   <h2>Broadcaster NLP Agent</h2>
   <p>
-    Kalshi lists broadcast contracts on specific words or phrases being said
-    by NBA announcers during live games. Current market pricing relies on
-    naive historical frequency. A game state aware model can build a
-    meaningfully better prior.
+    Kalshi offers broadcast contracts on specific words or phrases being said
+    by NBA announcers during a game. This model scrapes historical NBA play
+    by play data from the web to estimate how likely a specific announcer is
+    to say a specific word or phrase — trained on historical data only, with
+    no live update mechanism. The output is a pre game prior probability
+    compared against the Kalshi implied price to find edges before tip off.
   </p>
 
   <div class="dev-grid">
     <div class="dev-card">
-      <h3>Play-by-Play Scraper</h3>
+      <h3>Historical Data Scraper</h3>
       <p>
-        Scraping NBA.com and ESPN play by play feeds to build a historical
-        corpus of game state (score, time, foul count, timeout flags,
-        pace metrics) paired with timestamped broadcaster audio transcripts.
+        Scrapes historical NBA play by play data from the web to build a
+        corpus of announcer speech paired with game context — team, opponent,
+        venue, broadcast crew, and play type.
       </p>
     </div>
     <div class="dev-card">
       <h3>Phrase Probability Model</h3>
       <p>
-        Conditional model: $P(\text{phrase said} \mid \text{game state})$.
-        Features include score margin, total points pace relative to line,
-        momentum runs, star player foul trouble, and remaining time buckets.
+        Estimates $P(\text{phrase said} \mid \text{announcer, game context})$
+        from historical data only. No live update mechanism — the model
+        produces a fixed pre game probability for each word or phrase
+        of interest before the game starts.
       </p>
     </div>
     <div class="dev-card">
-      <h3>Real Time Prior Update</h3>
+      <h3>Pre Game Edge Detection</h3>
       <p>
-        Same importance weighting framework as the totals model — a calibrated
-        prior before market open, then live updates as game state evolves.
-        Goal is a prior that beats naive base rates by &gt;10 pp on average.
+        Compares the model probability against the Kalshi implied price for
+        broadcast word contracts. A trade fires when the model prior
+        meaningfully exceeds the market price, identified entirely before
+        tip off using historical data.
       </p>
     </div>
   </div>
 
   <div class="callout blue">
-    <div class="callout-title">// Status</div>
+    <div class="callout-title">// Approach</div>
     <p>
-      Data collection pipeline is live. Transcript alignment with play by play
-      timestamps is the current bottleneck — broadcaster audio lags the
-      official feed by 2–8 seconds, requiring a sliding window alignment pass.
-      Preliminary results show game state features explain ~18% of phrase
-      occurrence variance, versus ~4% for the naive historical base rate.
+      Unlike the totals model, there is no halftime reweighting here — the
+      prediction is made entirely from pre game data and locked in before the
+      game starts. The edge comes from a better calibrated prior on phrase
+      frequency per announcer, not from in game state updates. Market pricing
+      relies on naive base rates; the model conditions on who is calling the
+      game and what context historically drives phrase occurrence.
     </p>
   </div>
 </div>
