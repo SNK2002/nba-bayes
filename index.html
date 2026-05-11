@@ -1041,7 +1041,7 @@
     Kalshi offers broadcast contracts on specific words or phrases being said
     by NBA announcers during a game. This model scrapes historical NBA play
     by play data from the web to estimate how likely a specific announcer is
-    to say a specific word or phrase — trained on historical data only, with
+    to say a specific word or phrase, trained on historical data only, with
     no live update mechanism. The output is a pre game prior probability
     compared against the Kalshi implied price to find edges before tip off.
   </p>
@@ -1051,7 +1051,7 @@
       <h3>Historical Data Scraper</h3>
       <p>
         Scrapes historical NBA play by play data from the web to build a
-        corpus of announcer speech paired with game context — team, opponent,
+        corpus of announcer speech paired with game context: team, opponent,
         venue, broadcast crew, and play type.
       </p>
     </div>
@@ -1059,7 +1059,7 @@
       <h3>Phrase Probability Model</h3>
       <p>
         Estimates $P(\text{phrase said} \mid \text{announcer, game context})$
-        from historical data only. No live update mechanism — the model
+        from historical data only. No live update mechanism. The model
         produces a fixed pre game probability for each word or phrase
         of interest before the game starts.
       </p>
@@ -1078,7 +1078,7 @@
   <div class="callout blue">
     <div class="callout-title">// Approach</div>
     <p>
-      Unlike the totals model, there is no halftime reweighting here — the
+      Unlike the totals model, there is no halftime reweighting here. The
       prediction is made entirely from pre game data and locked in before the
       game starts. The edge comes from a better calibrated prior on phrase
       frequency per announcer, not from in game state updates. Market pricing
